@@ -1,0 +1,1 @@
+# keda-kafka-scaler-job
