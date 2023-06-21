@@ -1,0 +1,169 @@
+plugins {
+    id "groovy"
+    id "java-library"
+    id 'checkstyle'
+    id 'jacoco'
+    //    id "com.jfrog.artifactory" version "4.28.2"
+    id 'org.springframework.boot' version "2.7.3"
+    id "com.github.hierynomus.license" version "0.16.1"
+    id 'application'
+}
+
+apply plugin: 'io.spring.dependency-management'
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+group 'com.keda.scaler'
+
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    //    maven {
+    //        url "${artifactoryContextUrl}/repostories"
+    //        credentials {
+    //            username = artifactoryUsername
+    //            password = artifactoryPassword
+    //        }
+    //    }
+}
+
+configurations {
+    zip
+    all {
+        resolutionStrategy {
+            cacheChangingModulesFor 0, 'seconds'
+        }
+        exclude group: 'org.codehaus.groovy'
+        exclude group: 'org.apache.logging.log4j'
+    }
+}
+
+dependencies {
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-web'
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-aop'
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-validation'
+
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind'
+    implementation group: 'org.apache.commons', name: 'commons-lang3'
+    implementation group: 'de.ruedigermoeller', name: 'fst', version: '2.56'
+
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation "org.springframework.kafka:spring-kafka"
+
+    implementation group: 'net.snowflake', name: 'snowflake-jdbc', version: '3.13.19'
+
+    implementation group: 'com.azure.spring', name: 'spring-cloud-azure-starter-keyvault-secrets', version: '4.3.0'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+}
+
+task unzip {
+    doLast {
+        println "Dependencies:"
+        configurations.zip.each {
+            println it
+            def zipFile = file(it)
+            def outputMainDir = file("${buildDir}/resources/main")
+            def outputTestDir = file("${buildDir}/resources/test")
+            copy {
+                from zipTree(zipFile)
+                into outputMainDir
+            }
+            copy {
+                from zipTree(zipFile)
+                into outputTestDir
+            }
+        }
+    }
+}
+
+checkstyle {
+    toolVersion "8.8"
+}
+
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+jacocoTestReport {
+    group = "Reporting"
+    reports {
+        xml.enabled true
+        html.enabled true
+        csv.enabled false
+        html.destination file("${buildDir}/reports/coverage")
+    }
+    finalizedBy jacocoTestCoverageVerification
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            enabled = true
+            element = 'CLASS'
+            includes = ['com.keda.scaler.kafka.*']
+            excludes = ['com.keda.scaler.kafka.Application',
+                        'com.keda.scaler.kafka.utils.PrintUtils',
+                        'com.keda.scaler.kafka.AppConfig',
+                        'com.keda.scaler.kafka.constants.*']
+            limit {
+                minimum = 0.90
+            }
+        }
+    }
+}
+
+test {
+    //FST serialization for test (Java 17)
+    jvmArgs "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.math=ALL-UNNAMED",
+            "--add-opens=java.base/java.util=ALL-UNNAMED",
+            "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
+            "--add-opens=java.base/java.net=ALL-UNNAMED",
+            "--add-opens=java.base/java.text=ALL-UNNAMED",
+            "--add-opens=java.sql/java.sql=ALL-UNNAMED"
+    finalizedBy jacocoTestReport
+    testLogging.showStandardStreams = false
+    testLogging.exceptionFormat = 'full'
+}
+
+license {
+    ext.year = Calendar.getInstance().get(Calendar.YEAR)
+    includes(["**/*.java", "**/*.groovy"])
+}
+
+classes.dependsOn(licenseFormat)
+
+//compileJava.dependsOn unzip
+
+bootRun {
+    systemProperties = System.properties
+    systemProperty 'spring.profiles.active', 'production'
+    classpath += files('src/main/resources')
+}
+
+bootJar
+
+jar.enabled(true)
+
+//FST serialization and snowflake compatibility with Java 17
+applicationDefaultJvmArgs = [
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.math=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED",
+        "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
+        "--add-opens=java.base/java.net=ALL-UNNAMED",
+        "--add-opens=java.base/java.text=ALL-UNNAMED",
+        "--add-opens=java.sql/java.sql=ALL-UNNAMED",
+        "--add-opens=java.base/java.nio=ALL-UNNAMED"
+]

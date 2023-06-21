@@ -1,0 +1,85 @@
+ecom:
+  security:
+    liam:
+      additional-excluded-endpoints: [ /v3/api-docs*,/swagger/*,/health ]
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      base-path:
+      path-mapping:
+        health: "/health"
+
+by:
+  db:
+    url: jdbc:snowflake://${db.host}?db=${db.database}&warehouse=${db.warehouse}&role=${db.role}&schema=${db.schema}&CLIENT_RESULT_COLUMN_CASE_INSENSITIVE=TRUE&CLIENT_METADATA_REQUEST_USE_CONNECTION_CTX=TRUE
+
+engine:
+  size: T
+
+spring:
+  profiles:
+    active: production
+  application:
+    name: kafka-scaler
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: com.chalocodekare.kafkaclient.serialization.KafkaFstSerializer
+    consumer:
+      group-id: sparq-engine
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: com.chalocodekare.kafkaclient.serialization.KafkaFstDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: MANUAL_IMMEDIATE
+
+
+logging:
+  level:
+    root: INFO
+    org.apache.kafka: INFO
+    com.chalocodekare.*: INFO
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: production
+  cloud:
+    azure:
+      keyvault:
+        secret:
+          property-source-enabled: true
+          property-sources[0]:
+            credential:
+              client-id:
+              client-secret:
+            endpoint:
+            profile:
+              tenant-id:
+  kafka:
+    bootstrap-servers: ${kafkaHostResourceName}.servicebus.windows.net:${kafkaPort}
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: PLAIN
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password='Endpoint=sb://${kafkaHostResourceName}.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=${kafkaSharedAccessKey}';
+
+by:
+  db:
+    host: ${dbHost}
+    userName: ${dbUserName}
+    password: ${dbPassword}
+    warehouse:
+    database:
+    schema: ${dbSchema}
+    role:
+    maxPoolSize: 10
+    initialPoolSize: 1
+    enableTenantSchema: false
+
+server:
+  port: 8080

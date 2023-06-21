@@ -1,0 +1,29 @@
+spring:
+  config:
+    activate:
+      on-profile: development
+  autoconfigure:
+    exclude: com.azure.spring.cloud.autoconfigure.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration
+  kafka:
+    bootstrap-servers: broker:9093
+
+by:
+  db:
+    host:
+    userName:
+    password:
+    warehouse:
+    database:
+    schema: DEMO
+    role:
+    maxPoolSize:
+    initialPoolSize:
+    enableTenantSchema:
+
+server:
+  port: 1818
+
+logging:
+  level:
+    root: INFO
+    org.apache.kafka: INFO
